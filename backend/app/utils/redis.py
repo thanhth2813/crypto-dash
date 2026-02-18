@@ -18,7 +18,9 @@ def get_redis_client() -> redis.Redis:
     return _redis_client
 
 
-async def check_login_rate_limit(*, ip: str, email: str, limit: int = 5, window_seconds: int = 60) -> tuple[bool, int | None]:
+async def check_login_rate_limit(
+    *, ip: str, email: str, limit: int = 5, window_seconds: int = 60
+) -> tuple[bool, int | None]:
     """Return (allowed, retry_after_seconds).
 
     Fail-open: if Redis is down/throws, return (True, None) and log warning.
