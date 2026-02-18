@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@postgres:5432/cryptodash"
+    REDIS_URL: str = "redis://redis:6379"
+    JWT_SECRET: str = "dev-secret-change-me"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60
+    COINGECKO_BASE_URL: str = "https://api.coingecko.com/api/v3"
 
-    SECRET_KEY: str = "change-me"
-    ALGORITHM: str = "HS256"
-
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-
-    DB_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/postgres"
+    class Config:
+        env_file = ".env"
 
 
 settings = Settings()
