@@ -1,0 +1,51 @@
+name: CD — Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+
+# Prevent concurrent deploys
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-latest
+
+    # Only run when triggered by push to main AND secrets are configured
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Skip gracefully if VPS secrets not yet configured
+      - name: Check secrets
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "⚠️  SSH_HOST secret not set — skipping deploy"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Deploy via SSH
+        if: steps.check_secrets.outputs.skip == 'false'
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            bash /root/projects/crypto-dash/scripts/deploy.sh /root/projects/crypto-dash
+
+      - name: Skip notice
+        if: steps.check_secrets.outputs.skip == 'true'
+        run: |
+          echo "ℹ️  Deploy skipped: VPS secrets not configured."
+          echo "   Add SSH_HOST, SSH_USER, SSH_KEY to GitHub repo secrets to enable auto-deploy."
