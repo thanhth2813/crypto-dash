@@ -20,6 +20,10 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 
+def create_access_token(user_id: str, expires_minutes: int | None = None) -> str:
+    return create_token(user_id=user_id, token_type="access", expires_minutes=expires_minutes)
+
+
 def create_token(*, user_id: str, token_type: str = "access", expires_minutes: int | None = None) -> str:
     now = datetime.now(timezone.utc)
     if expires_minutes is None:
