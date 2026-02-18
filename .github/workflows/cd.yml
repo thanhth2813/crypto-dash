@@ -9,143 +9,43 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_BACKEND: ghcr.io/${{ github.repository_owner }}/crypto-dash-backend
-  IMAGE_FRONTEND: ghcr.io/${{ github.repository_owner }}/crypto-dash-frontend
-
 jobs:
-  # ============================================================
-  # Job 1: Build & push images to GHCR
-  # ============================================================
-  build-push:
-    name: Build & Push images
+  deploy:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
-    outputs:
-      image_tag: ${{ github.sha }}
+    # Only run when triggered by push to main AND secrets are configured
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build & push backend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./backend
-          push: true
-          tags: |
-            ${{ env.IMAGE_BACKEND }}:${{ github.sha }}
-            ${{ env.IMAGE_BACKEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ env.IMAGE_FRONTEND }}:${{ github.sha }}
-            ${{ env.IMAGE_FRONTEND }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ============================================================
-  # Job 2: Deploy to VPS via SSH
-  # ============================================================
-  deploy:
-    name: Deploy to VPS
-    needs: build-push
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout (for docker-compose.yml)
-        uses: actions/checkout@v4
+      # Skip gracefully if VPS secrets not yet configured
+      - name: Check secrets
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.SSH_HOST }}" ]; then
+            echo "⚠️  SSH_HOST secret not set — skipping deploy"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Deploy via SSH
+        if: steps.check_secrets.outputs.skip == 'false'
         uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          envs: GITHUB_SHA,REGISTRY,IMAGE_BACKEND,IMAGE_FRONTEND
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
           script: |
-            set -e
+            bash /root/projects/crypto-dash/scripts/deploy.sh /root/projects/crypto-dash
 
-            DEPLOY_DIR="${{ secrets.VPS_DEPLOY_PATH || '/opt/crypto-dash' }}"
-            IMAGE_TAG="${{ needs.build-push.outputs.image_tag }}"
-            REGISTRY="${{ env.REGISTRY }}"
-            IMAGE_BACKEND="${{ env.IMAGE_BACKEND }}"
-            IMAGE_FRONTEND="${{ env.IMAGE_FRONTEND }}"
-
-            echo "=== Deploy $IMAGE_TAG ==="
-
-            # --- Save current tag for rollback ---
-            ROLLBACK_FILE="$DEPLOY_DIR/.last_image_tag"
-            if [ -f "$ROLLBACK_FILE" ]; then
-              PREV_TAG=$(cat "$ROLLBACK_FILE")
-              echo "Previous tag: $PREV_TAG"
-            fi
-
-            cd "$DEPLOY_DIR"
-
-            # --- Pull latest compose file ---
-            git fetch origin main
-            git reset --hard origin/main
-
-            # --- Login to GHCR ---
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-            # --- Pull new images ---
-            export IMAGE_TAG="$IMAGE_TAG"
-            docker compose pull
-
-            # --- Rolling update ---
-            docker compose up -d --remove-orphans --no-build
-
-            # --- Health check (retry 5x with 10s interval) ---
-            echo "=== Health check ==="
-            for i in 1 2 3 4 5; do
-              sleep 10
-              if curl -sf http://localhost/api/health > /dev/null 2>&1; then
-                echo "✅ Health check passed (attempt $i)"
-                echo "$IMAGE_TAG" > "$ROLLBACK_FILE"
-                exit 0
-              fi
-              echo "⏳ Attempt $i failed, retrying..."
-            done
-
-            # --- Rollback on failure ---
-            echo "❌ Health check failed! Rolling back to $PREV_TAG..."
-            if [ -n "$PREV_TAG" ]; then
-              export IMAGE_TAG="$PREV_TAG"
-              docker compose up -d --remove-orphans --no-build
-              echo "↩️  Rolled back to $PREV_TAG"
-            fi
-            exit 1
-
-      - name: Notify success
-        if: success()
+      - name: Skip notice
+        if: steps.check_secrets.outputs.skip == 'true'
         run: |
-          echo "✅ Deployed ${{ needs.build-push.outputs.image_tag }} to VPS"
-
-      - name: Notify failure
-        if: failure()
-        run: |
-          echo "❌ Deploy FAILED — check VPS logs"
-          exit 1
+          echo "ℹ️  Deploy skipped: VPS secrets not configured."
+          echo "   Add SSH_HOST, SSH_USER, SSH_KEY to GitHub repo secrets to enable auto-deploy."
