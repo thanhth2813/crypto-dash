@@ -1,13 +1,12 @@
 # ============================================================
-# Dockerfile — crypto-dash auth-api (multi-stage)
+# Dockerfile — crypto-dash backend (multi-stage)
 # ============================================================
 
-# ---- Stage 1: build deps ----
+# ---- Stage 1: build ----
 FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
-# Install build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -22,13 +21,15 @@ FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Copy installed packages from builder
+# curl needed for docker-compose healthcheck
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /install /usr/local
 
-# Copy app source
 COPY . .
 
 EXPOSE 8000
 
-# Dev mode (hot-reload). Override CMD in production.
+# Dev mode with hot-reload
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

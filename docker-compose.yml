@@ -1,8 +1,6 @@
-version: "3.9"
-
 # ============================================================
-# crypto-dash — Docker Compose
-# Services: auth-api (FastAPI) | db (PostgreSQL 16) | redis
+# crypto-dash — Docker Compose (5 services)
+# backend | frontend | postgres | redis | nginx
 # ============================================================
 
 services:
@@ -10,7 +8,7 @@ services:
   # ----------------------------------------------------------
   # PostgreSQL 16
   # ----------------------------------------------------------
-  db:
+  postgres:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -18,8 +16,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-supersecret}
       POSTGRES_DB: ${POSTGRES_DB:-crypto_dash}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
     ports:
+      # DEV only: exposes DB to host for local tooling (TablePlus, psql CLI)
+      # PRODUCTION: remove this ports mapping — use internal backend_net only
       - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crypto_user} -d ${POSTGRES_DB:-crypto_dash}"]
@@ -37,6 +37,8 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
+      # DEV only: exposes Redis to host for local debugging (redis-cli, RedisInsight)
+      # PRODUCTION: remove this ports mapping — use internal backend_net only
       - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -47,25 +49,24 @@ services:
       - backend_net
 
   # ----------------------------------------------------------
-  # Auth API (FastAPI)
+  # Backend — FastAPI (hot-reload dev mode)
   # ----------------------------------------------------------
-  auth-api:
+  backend:
     build:
-      context: ./auth-api
+      context: ./backend
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file: .env
     environment:
-      DB_URL: postgresql+asyncpg://${POSTGRES_USER:-crypto_user}:${POSTGRES_PASSWORD:-supersecret}@db:5432/${POSTGRES_DB:-crypto_dash}
-      REDIS_HOST: redis
-      REDIS_PORT: "6379"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-crypto_user}:${POSTGRES_PASSWORD:-supersecret}@postgres:5432/${POSTGRES_DB:-crypto_dash}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
     ports:
       - "8000:8000"
     volumes:
-      # Hot-reload: mount source for dev
-      - ./auth-api:/app
+      - ./backend:/app
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
@@ -78,11 +79,50 @@ services:
     networks:
       - backend_net
 
+  # ----------------------------------------------------------
+  # Frontend — React + Vite (hot-reload dev mode)
+  # ----------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules   # preserve container node_modules
+    depends_on:
+      - backend
+    networks:
+      - backend_net
+
+  # ----------------------------------------------------------
+  # Nginx — Reverse proxy
+  # /api/*  → backend:8000  (strip /api prefix)
+  # /ws     → backend:8000  (WebSocket)
+  # /*      → frontend:3000
+  # ----------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    networks:
+      - backend_net
+
 # ----------------------------------------------------------
 # Volumes & Networks
 # ----------------------------------------------------------
 volumes:
-  postgres_data:
+  pgdata:
 
 networks:
   backend_net:
