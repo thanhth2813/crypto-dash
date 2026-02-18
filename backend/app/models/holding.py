@@ -15,8 +15,8 @@ def utcnow() -> datetime:
 class Holding(Base):
     __tablename__ = "holdings"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
 
     symbol: Mapped[str] = mapped_column(String, index=True, nullable=False)
     quantity: Mapped[float] = mapped_column(Float, nullable=False)

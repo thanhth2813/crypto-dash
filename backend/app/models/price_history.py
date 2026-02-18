@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import DateTime, Float, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from . import Base
@@ -15,9 +15,14 @@ def utcnow() -> datetime:
 class PriceHistory(Base):
     __tablename__ = "price_history"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
+    __table_args__ = (
+        UniqueConstraint("coin_id", "timeframe", "ts", name="uq_price_coin_tf_ts"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
     symbol: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    coin_id: Mapped[str] = mapped_column(String, index=True, nullable=False)  # e.g. 'bitcoin'
     timeframe: Mapped[str] = mapped_column(String, index=True, nullable=False)  # e.g. 1m|5m|1h|1d
 
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)

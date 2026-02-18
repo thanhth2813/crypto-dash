@@ -1,21 +1,21 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from .routers import alerts, auth, market, portfolio, signals
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup (placeholder)
+    yield
+    # shutdown (placeholder)
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="crypto-dash-backend")
-
-    @app.on_event("startup")
-    async def _startup() -> None:
-        # Placeholder for DB/Redis init
-        return None
-
-    @app.on_event("shutdown")
-    async def _shutdown() -> None:
-        return None
+    app = FastAPI(title="crypto-dash-backend", lifespan=lifespan)
 
     @app.get("/health")
     async def health() -> dict:

@@ -15,10 +15,15 @@ def utcnow() -> datetime:
 class Alert(Base):
     __tablename__ = "alerts"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    user_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
 
+    # Market identifiers
     symbol: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    coin_id: Mapped[str] = mapped_column(String, index=True, nullable=False)  # e.g. 'bitcoin'
+
+    # Alert logic
+    condition: Mapped[str] = mapped_column(String, nullable=False)  # 'above' | 'below'
     target_price: Mapped[float] = mapped_column(Float, nullable=False)
 
     status: Mapped[str] = mapped_column(String, default="active", nullable=False)  # active|triggered|paused
