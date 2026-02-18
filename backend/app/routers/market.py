@@ -53,7 +53,7 @@ async def history(coin_id: str, days: int = 7) -> list[OHLCResponse]:
     for row in data:
         # [timestamp, open, high, low, close]
         try:
-            ts_ms, o, h, l, c = row
+            ts_ms, o, h, low_val, c = row
             out.append(
                 OHLCResponse(
                     symbol=coin_id.upper(),
@@ -62,7 +62,7 @@ async def history(coin_id: str, days: int = 7) -> list[OHLCResponse]:
                     ts=MarketService.ms_to_dt(int(ts_ms)),
                     open=float(o),
                     high=float(h),
-                    low=float(l),
+                    low=float(low_val),
                     close=float(c),
                     volume=0.0,
                 )
