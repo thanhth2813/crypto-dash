@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routers.auth import router as auth_router
 
-app = FastAPI(title="auth-api")
+app = FastAPI(title="crypto-dash API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
