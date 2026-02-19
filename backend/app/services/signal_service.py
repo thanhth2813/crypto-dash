@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass
-from typing import Any
 
 from ..services.market_service import MarketService
 from ..utils.redis import get_redis_client
