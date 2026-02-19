@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from . import Base
 
@@ -26,3 +26,7 @@ class User(Base):
         onupdate=utcnow,
         nullable=False,
     )
+    
+    # Relationships
+    bots = relationship("TradingBot", back_populates="user", cascade="all, delete-orphan")
+    trade_orders = relationship("TradeOrder", back_populates="user", cascade="all, delete-orphan")
