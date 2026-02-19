@@ -118,6 +118,30 @@ services:
     networks:
       - backend_net
 
+  # ----------------------------------------------------------
+  # Worker — Background jobs (APScheduler)
+  # ----------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-crypto_user}:${POSTGRES_PASSWORD:-supersecret}@postgres:5432/${POSTGRES_DB:-crypto_dash}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    command: python -m app.jobs.worker
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend_net
+
 # ----------------------------------------------------------
 # Volumes & Networks
 # ----------------------------------------------------------
