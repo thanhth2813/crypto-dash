@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import DateTime, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from . import Base
@@ -18,8 +18,11 @@ class Holding(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
 
+    coin_id: Mapped[str] = mapped_column(String, index=True, nullable=False)  # e.g. 'bitcoin'
     symbol: Mapped[str] = mapped_column(String, index=True, nullable=False)
-    quantity: Mapped[float] = mapped_column(Float, nullable=False)
-    avg_price: Mapped[float] = mapped_column(Float, nullable=False)
 
+    amount: Mapped[float] = mapped_column(Numeric(20, 8), nullable=False)
+    buy_price: Mapped[float] = mapped_column(Numeric(20, 8), nullable=False)
+
+    bought_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
