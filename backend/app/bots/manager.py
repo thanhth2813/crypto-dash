@@ -1,15 +1,12 @@
 """Bot Manager - Singleton service for managing running bots."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Dict
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from ..database import SessionLocal
-from ..models.trading_bot import TradingBot
-from ..services.bot_service import BotService
 
 logger = logging.getLogger(__name__)
 
