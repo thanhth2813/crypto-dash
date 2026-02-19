@@ -5,8 +5,11 @@ import logging
 from typing import Dict
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from sqlalchemy import select
 
 from ..database import SessionLocal
+from ..models.trade_order import TradeOrder
+from ..models.trading_bot import TradingBot
 
 logger = logging.getLogger(__name__)
 
@@ -39,24 +42,23 @@ class BotManager:
             return
         
         async with SessionLocal() as db:
-            # Fetch bot config
+            # Fetch bot config using ORM
             result = await db.execute(
-                """SELECT id, user_id, strategy, symbol, config, paper_mode 
-                   FROM trading_bots WHERE id = :bot_id"""
+                select(TradingBot).where(TradingBot.id == bot_id)
             )
-            bot_row = result.fetchone()
+            bot = result.scalar_one_or_none()
             
-            if not bot_row:
+            if not bot:
                 logger.error(f"Bot {bot_id} not found")
                 return
             
             bot_data = {
-                "id": bot_row[0],
-                "user_id": bot_row[1],
-                "strategy": bot_row[2],
-                "symbol": bot_row[3],
-                "config": bot_row[4],
-                "paper_mode": bot_row[5],
+                "id": bot.id,
+                "user_id": bot.user_id,
+                "strategy": bot.strategy,
+                "symbol": bot.symbol,
+                "config": bot.config,
+                "paper_mode": bot.paper_mode,
             }
         
         # Schedule based on strategy
@@ -118,23 +120,82 @@ class BotManager:
             
             # Mark bot as error status
             async with SessionLocal() as db:
-                await db.execute(
-                    """UPDATE trading_bots SET status = 'error' WHERE id = :bot_id""",
-                    {"bot_id": bot_id}
+                result = await db.execute(
+                    select(TradingBot).where(TradingBot.id == bot_id)
                 )
-                await db.commit()
+                bot = result.scalar_one_or_none()
+                if bot:
+                    bot.status = "error"
+                    await db.commit()
             
             # Stop the bot
             await self.stop_bot(bot_id)
     
     async def _run_dca_tick(self, bot_id: int, bot_data: dict) -> None:
         """Run DCA strategy tick."""
-        # TODO: Implement DCA logic
-        #  - Get current price
-        #  - Check if it's time to buy (based on interval)
-        #  - Place buy order
-        #  - Update bot P&L
-        logger.debug(f"DCA tick for bot {bot_id}")
+        from ..exchanges.paper import PaperExchange
+        from ..services.market_service import MarketService
+        from .dca_bot import DcaBot, DcaBotConfig
+        
+        config = bot_data["config"]
+        
+        # Create exchange instance
+        exchange = PaperExchange(
+            namespace=f"bot_{bot_id}",
+            initial_balances={"USDT": config.get("budget", 10000)}
+        )
+        
+        # Get current market price
+        prices = await MarketService.get_top_prices()
+        symbol = bot_data["symbol"]
+        # Extract coin_id from symbol (e.g., BTCUSDT -> bitcoin)
+        coin_symbol = symbol.replace("USDT", "").lower()
+        # Map common symbols to coin IDs
+        coin_map = {"btc": "bitcoin", "eth": "ethereum", "bnb": "binancecoin"}
+        coin_id = coin_map.get(coin_symbol, coin_symbol)
+        
+        market_price = next(
+            (p["current_price"] for p in prices if p["id"] == coin_id),
+            None
+        )
+        if not market_price:
+            logger.warning(f"Bot {bot_id}: price not found for {coin_id}")
+            return
+        
+        # Create bot instance with valid config fields
+        bot_config = DcaBotConfig(
+            symbol=symbol,
+            amount_per_buy=config.get("amount_per_buy", 0.001),
+            interval_minutes=config.get("interval_minutes", 60),
+            max_buys=config.get("max_buys", 10),
+        )
+        bot = DcaBot(exchange=exchange, config=bot_config)
+        
+        # Execute tick
+        order = await bot.tick(market_price=market_price)
+        
+        # Log order to database if filled
+        if order and order.status.value == "FILLED":
+            async with SessionLocal() as db:
+                trade = TradeOrder(
+                    bot_id=bot_id,
+                    user_id=bot_data["user_id"],
+                    exchange="paper",
+                    symbol=symbol,
+                    side=order.side.value,
+                    order_type=order.order_type.value,
+                    amount=order.amount,
+                    price=order.avg_fill_price,
+                    filled_amount=order.filled_amount,
+                    filled_price=order.avg_fill_price,
+                    status="filled",
+                    fee=order.fee,
+                    fee_currency="USDT",
+                    exchange_order_id=order.order_id,
+                )
+                db.add(trade)
+                await db.commit()
+                logger.info(f"Bot {bot_id}: DCA order filled at ${order.avg_fill_price}")
     
     async def _run_grid_tick(self, bot_id: int, bot_data: dict) -> None:
         """Run Grid strategy tick."""
@@ -147,12 +208,71 @@ class BotManager:
     
     async def _run_signal_tick(self, bot_id: int, bot_data: dict) -> None:
         """Run Signal-based strategy tick."""
-        # TODO: Implement Signal logic
-        #  - Get current signals (RSI, EMA, etc.)
-        #  - Evaluate trading conditions
-        #  - Place orders based on signals
-        #  - Update bot P&L
-        logger.debug(f"Signal tick for bot {bot_id}")
+        from ..exchanges.paper import PaperExchange
+        from ..services.market_service import MarketService
+        from .signal_bot import SignalBot, SignalBotConfig
+        
+        config = bot_data["config"]
+        
+        # Create exchange instance
+        exchange = PaperExchange(
+            namespace=f"bot_{bot_id}",
+            initial_balances={"USDT": config.get("budget", 10000)}
+        )
+        
+        # Get current market price
+        prices = await MarketService.get_top_prices()
+        symbol = bot_data["symbol"]
+        coin_symbol = symbol.replace("USDT", "").lower()
+        coin_map = {"btc": "bitcoin", "eth": "ethereum", "bnb": "binancecoin"}
+        coin_id = coin_map.get(coin_symbol, coin_symbol)
+        
+        market_price = next(
+            (p["current_price"] for p in prices if p["id"] == coin_id),
+            None
+        )
+        if not market_price:
+            logger.warning(f"Bot {bot_id}: price not found for {coin_id}")
+            return
+        
+        # Create bot instance with valid config fields
+        bot_config = SignalBotConfig(
+            symbol=symbol,
+            coin_id=coin_id,
+            signal_type=config.get("signal_type", "rsi_ema"),
+            buy_threshold=config.get("buy_threshold", 0.0),
+            sell_threshold=config.get("sell_threshold", 0.0),
+            amount=config.get("amount", 0.001),
+        )
+        bot = SignalBot(exchange=exchange, config=bot_config)
+        
+        # Execute tick
+        order = await bot.tick(market_price=market_price)
+        
+        # Log order to database if filled
+        if order and order.status.value == "FILLED":
+            async with SessionLocal() as db:
+                trade = TradeOrder(
+                    bot_id=bot_id,
+                    user_id=bot_data["user_id"],
+                    exchange="paper",
+                    symbol=symbol,
+                    side=order.side.value,
+                    order_type=order.order_type.value,
+                    amount=order.amount,
+                    price=order.avg_fill_price,
+                    filled_amount=order.filled_amount,
+                    filled_price=order.avg_fill_price,
+                    status="filled",
+                    fee=order.fee,
+                    fee_currency="USDT",
+                    exchange_order_id=order.order_id,
+                )
+                db.add(trade)
+                await db.commit()
+                logger.info(
+                    f"Bot {bot_id}: Signal {order.side.value} order filled at ${order.avg_fill_price}"
+                )
     
     def shutdown(self) -> None:
         """Shutdown the scheduler."""
