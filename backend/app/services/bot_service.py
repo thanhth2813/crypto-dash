@@ -110,7 +110,10 @@ class BotService:
         await db.commit()
         await db.refresh(bot)
         
-        # TODO: Trigger BotManager.start_bot(bot_id) in Task #26
+        # Trigger BotManager to start the bot
+        from ..bots.manager import BotManager
+        manager = BotManager.get_instance()
+        await manager.start_bot(bot.id)
         
         return bot
     
@@ -128,7 +131,10 @@ class BotService:
         await db.commit()
         await db.refresh(bot)
         
-        # TODO: Trigger BotManager.stop_bot(bot_id) in Task #26
+        # Trigger BotManager to stop the bot
+        from ..bots.manager import BotManager
+        manager = BotManager.get_instance()
+        await manager.stop_bot(bot.id)
         
         return bot
     
