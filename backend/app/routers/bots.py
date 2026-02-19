@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..dependencies import get_current_user
-from ..schemas.bot import BotCreate, BotDetailResponse, BotResponse, BotUpdate, TradeOrderResponse
+from ..schemas.bot import BotCreate, BotDetailResponse, BotResponse, TradeOrderResponse
 from ..services.bot_service import BotService
 
 router = APIRouter(prefix="/bots", tags=["bots"])

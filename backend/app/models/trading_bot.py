@@ -1,15 +1,14 @@
 """Trading bot model."""
 from __future__ import annotations
 
+import enum
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from . import Base
-
-import enum
 
 
 class BotStrategy(str, enum.Enum):
