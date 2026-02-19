@@ -9,14 +9,23 @@ import pytest
 import pytest_asyncio
 from fastapi import HTTPException
 
+from app.database import get_db
+from app.dependencies import get_current_user
 from app.main import app
 
 
 @pytest_asyncio.fixture
 async def client():
+    async def _fake_get_db():
+        yield None
+
+    app.dependency_overrides[get_db] = _fake_get_db
+
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture
@@ -50,11 +59,11 @@ async def test_add_holding_success(client, monkeypatch, auth_header, mock_user):
     async def _add(db, user_id, req):
         return holding
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
+    app.dependency_overrides[get_current_user] = mock_current_user
     monkeypatch.setattr("app.services.portfolio_service.PortfolioService.add_holding", _add)
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
 
     res = await client.post(
         "/portfolio",
@@ -73,10 +82,10 @@ async def test_add_holding_success(client, monkeypatch, auth_header, mock_user):
 async def test_add_holding_negative_amount_422(client, auth_header, mock_user, monkeypatch):
     """Test add holding with negative amount returns 422."""
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
+    app.dependency_overrides[get_current_user] = mock_current_user
 
     res = await client.post(
         "/portfolio",
@@ -120,12 +129,14 @@ async def test_list_holdings_success(client, monkeypatch, auth_header, mock_user
     async def _prices():
         return [{"id": "bitcoin", "current_price": 60000}]
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
+    app.dependency_overrides[get_current_user] = mock_current_user
+
     monkeypatch.setattr("app.services.portfolio_service.PortfolioService.list_holdings", _list)
-    monkeypatch.setattr("app.services.market_service.MarketService.get_top_prices", _prices)
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
+    # patch where it's used (imported into router module)
+    monkeypatch.setattr("app.routers.portfolio.MarketService.get_top_prices", _prices)
 
     res = await client.get("/portfolio", headers=auth_header)
     assert res.status_code == 200
@@ -162,13 +173,12 @@ async def test_update_holding_success(client, monkeypatch, auth_header, mock_use
     async def _update(db, user_id, holding_id, req):
         return holding
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
-    monkeypatch.setattr(
-        "app.services.portfolio_service.PortfolioService.update_holding", _update
-    )
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
+    app.dependency_overrides[get_current_user] = mock_current_user
+
+    monkeypatch.setattr("app.services.portfolio_service.PortfolioService.update_holding", _update)
 
     res = await client.put(
         "/portfolio/1",
@@ -188,13 +198,12 @@ async def test_update_holding_not_found_404(client, monkeypatch, auth_header, mo
     async def _update(db, user_id, holding_id, req):
         raise HTTPException(status_code=404, detail="holding not found")
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
-    monkeypatch.setattr(
-        "app.services.portfolio_service.PortfolioService.update_holding", _update
-    )
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
+    app.dependency_overrides[get_current_user] = mock_current_user
+
+    monkeypatch.setattr("app.services.portfolio_service.PortfolioService.update_holding", _update)
 
     res = await client.put(
         "/portfolio/999",
@@ -216,13 +225,12 @@ async def test_delete_holding_success(client, monkeypatch, auth_header, mock_use
     async def _delete(db, user_id, holding_id):
         pass  # success
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
-    monkeypatch.setattr(
-        "app.services.portfolio_service.PortfolioService.delete_holding", _delete
-    )
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
+    app.dependency_overrides[get_current_user] = mock_current_user
+
+    monkeypatch.setattr("app.services.portfolio_service.PortfolioService.delete_holding", _delete)
 
     res = await client.delete("/portfolio/1", headers=auth_header)
     assert res.status_code == 200
@@ -237,13 +245,12 @@ async def test_delete_holding_not_found_404(client, monkeypatch, auth_header, mo
     async def _delete(db, user_id, holding_id):
         raise HTTPException(status_code=404, detail="holding not found")
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
-    monkeypatch.setattr(
-        "app.services.portfolio_service.PortfolioService.delete_holding", _delete
-    )
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
+    app.dependency_overrides[get_current_user] = mock_current_user
+
+    monkeypatch.setattr("app.services.portfolio_service.PortfolioService.delete_holding", _delete)
 
     res = await client.delete("/portfolio/999", headers=auth_header)
     assert res.status_code == 404
@@ -265,11 +272,12 @@ async def test_summary_success(client, monkeypatch, auth_header, mock_user):
             "total_pnl": 10000.0,
         }
 
-    def _get_user(token):
+    async def mock_current_user():
         return mock_user
 
+    app.dependency_overrides[get_current_user] = mock_current_user
+
     monkeypatch.setattr("app.services.portfolio_service.PortfolioService.get_summary", _summary)
-    monkeypatch.setattr("app.dependencies.get_current_user", lambda: _get_user)
 
     res = await client.get("/portfolio/summary", headers=auth_header)
     assert res.status_code == 200
