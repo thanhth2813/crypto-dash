@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import httpx
+import pytest
 import pytest_asyncio
 
 from app.main import app
