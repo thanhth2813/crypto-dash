@@ -3,13 +3,13 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import httpx
-import pytest
+import pytest_asyncio
 
 from app.main import app
 from app.utils import security as sec
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:

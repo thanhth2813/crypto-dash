@@ -6,12 +6,13 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+import pytest_asyncio
 from fastapi import HTTPException
 
 from app.main import app
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client():
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:

@@ -47,8 +47,8 @@ async def _check_limit(*, key: str, limit: int, window_seconds: int) -> tuple[bo
 async def check_login_rate_limit(*, ip: str, email: str) -> tuple[bool, int | None]:
     """2-tier login rate limit.
 
-    - Per IP: 20/min  -> key `rl:login:ip:{ip}`
-    - Per email: 5/min -> key `rl:login:email:{email}`
+    - Per IP: 20/15min  -> key `rl:login:ip:{ip}`
+    - Per email: 5/15min -> key `rl:login:email:{email}`
 
     Both must pass.
 
@@ -56,11 +56,12 @@ async def check_login_rate_limit(*, ip: str, email: str) -> tuple[bool, int | No
     """
 
     try:
-        ip_ok, ip_retry = await _check_limit(key=f"rl:login:ip:{ip}", limit=20, window_seconds=60)
-        email_ok, email_retry = await _check_limit(key=f"rl:login:email:{email}", limit=5, window_seconds=60)
+        window = 15 * 60
+        ip_ok, ip_retry = await _check_limit(key=f"rl:login:ip:{ip}", limit=20, window_seconds=window)
+        email_ok, email_retry = await _check_limit(key=f"rl:login:email:{email}", limit=5, window_seconds=window)
 
         if not ip_ok or not email_ok:
-            retry = max(ip_retry or 0, email_retry or 0) or 60
+            retry = max(ip_retry or 0, email_retry or 0) or (15 * 60)
             return False, retry
 
         return True, None
