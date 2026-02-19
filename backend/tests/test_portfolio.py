@@ -98,6 +98,7 @@ async def test_add_holding_negative_amount_422(client, auth_header, mock_user, m
 @pytest.mark.asyncio
 async def test_add_holding_unauthorized_401(client):
     """Test add holding without auth returns 401."""
+    app.dependency_overrides.pop(get_current_user, None)
     res = await client.post(
         "/portfolio",
         json={"coin_id": "bitcoin", "symbol": "BTC", "amount": 0.5, "buy_price": 50000},
@@ -150,6 +151,7 @@ async def test_list_holdings_success(client, monkeypatch, auth_header, mock_user
 @pytest.mark.asyncio
 async def test_list_holdings_unauthorized_401(client):
     """Test list holdings without auth returns 401."""
+    app.dependency_overrides.pop(get_current_user, None)
     res = await client.get("/portfolio")
     assert res.status_code == 401
 
@@ -270,6 +272,7 @@ async def test_summary_success(client, monkeypatch, auth_header, mock_user):
             "total_invested": 50000.0,
             "total_value": 60000.0,
             "total_pnl": 10000.0,
+            "allocation": [],
         }
 
     async def mock_current_user():

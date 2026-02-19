@@ -39,9 +39,8 @@ async def login(
 
     allowed, retry_after = await check_login_rate_limit(ip=ip, email=email)
     if not allowed:
-        if retry_after is not None:
-            response.headers["Retry-After"] = str(retry_after)
-        raise HTTPException(status_code=429, detail="too many attempts")
+        headers = {"Retry-After": str(retry_after)} if retry_after is not None else None
+        raise HTTPException(status_code=429, detail="too many attempts", headers=headers)
 
     result = await AuthService.login(db=db, req=req)
     if result is None:
