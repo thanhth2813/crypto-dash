@@ -11,7 +11,7 @@ from app.config import settings
 from app.models import Base  # noqa: F401
 
 # Import models so Alembic sees them via Base.metadata
-from app.models import Alert, Holding, PriceHistory, User  # noqa: F401,E402
+from app.models import Alert, Holding, PriceHistory, RefreshToken, User  # noqa: F401,E402
 
 config = context.config
 
