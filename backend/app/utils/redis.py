@@ -18,36 +18,50 @@ def get_redis_client() -> redis.Redis:
     return _redis_client
 
 
-async def check_login_rate_limit(
-    *, ip: str, email: str, limit: int = 5, window_seconds: int = 60
-) -> tuple[bool, int | None]:
-    """Return (allowed, retry_after_seconds).
+async def _check_limit(*, key: str, limit: int, window_seconds: int) -> tuple[bool, int | None]:
+    """Return (ok, retry_after).
+
+    Assumes Redis available; caller handles fail-open.
+    """
+
+    r = get_redis_client()
+    pipe = r.pipeline()
+    pipe.incr(key)
+    pipe.ttl(key)
+    count, ttl = await pipe.execute()
+
+    if ttl == -1:
+        await r.expire(key, window_seconds)
+        ttl = window_seconds
+    elif ttl == -2:
+        await r.expire(key, window_seconds)
+        ttl = window_seconds
+
+    if int(count) > limit:
+        retry_after = int(ttl) if ttl and int(ttl) > 0 else window_seconds
+        return False, retry_after
+
+    return True, None
+
+
+async def check_login_rate_limit(*, ip: str, email: str) -> tuple[bool, int | None]:
+    """2-tier login rate limit.
+
+    - Per IP: 20/min  -> key `rl:login:ip:{ip}`
+    - Per email: 5/min -> key `rl:login:email:{email}`
+
+    Both must pass.
 
     Fail-open: if Redis is down/throws, return (True, None) and log warning.
     """
 
-    key = f"rl:login:{ip}:{email}"
-
     try:
-        r = get_redis_client()
-        # Atomically increment and set TTL on first hit
-        pipe = r.pipeline()
-        pipe.incr(key)
-        pipe.ttl(key)
-        count, ttl = await pipe.execute()
+        ip_ok, ip_retry = await _check_limit(key=f"rl:login:ip:{ip}", limit=20, window_seconds=60)
+        email_ok, email_retry = await _check_limit(key=f"rl:login:email:{email}", limit=5, window_seconds=60)
 
-        if ttl == -1:
-            # ensure expiry
-            await r.expire(key, window_seconds)
-            ttl = window_seconds
-        elif ttl == -2:
-            # key missing after pipeline? set expiry defensively
-            await r.expire(key, window_seconds)
-            ttl = window_seconds
-
-        if int(count) > limit:
-            retry_after = int(ttl) if ttl and int(ttl) > 0 else window_seconds
-            return False, retry_after
+        if not ip_ok or not email_ok:
+            retry = max(ip_retry or 0, email_retry or 0) or 60
+            return False, retry
 
         return True, None
 

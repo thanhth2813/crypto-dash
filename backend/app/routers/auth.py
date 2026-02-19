@@ -15,12 +15,16 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=AuthResponse)
 async def register(req: RegisterRequest, db: AsyncSession = Depends(get_db)) -> AuthResponse:
     try:
-        token, user = await AuthService.register(db=db, req=req)
+        access_token, refresh_token, user = await AuthService.register(db=db, req=req)
     except ValueError:
         # 409 if email already exists, but keep message generic
         raise HTTPException(status_code=409, detail="registration failed")
 
-    return AuthResponse(token=token, user=UserResponse(id=user.id, email=user.email))
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserResponse(id=user.id, email=user.email),
+    )
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -43,8 +47,12 @@ async def login(
     if result is None:
         raise HTTPException(status_code=401, detail="invalid credentials")
 
-    token, user = result
-    return AuthResponse(token=token, user=UserResponse(id=user.id, email=user.email))
+    access_token, refresh_token, user = result
+    return AuthResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserResponse(id=user.id, email=user.email),
+    )
 
 
 @router.get("/me", response_model=UserResponse)
