@@ -4,8 +4,11 @@ import { useAuth } from '../../contexts/AuthContext'
 const NAV_ITEMS = [
   { to: '/',          label: '📊 Dashboard' },
   { to: '/portfolio', label: '💼 Portfolio' },
-  { to: '/alerts',   label: '🔔 Alerts'    },
-  { to: '/signals',  label: '📈 Signals'   },
+  { to: '/bots',      label: '🤖 Bots'      },
+  { to: '/trades',    label: '📋 Trades'    },
+  { to: '/alerts',    label: '🔔 Alerts'    },
+  { to: '/signals',   label: '📈 Signals'   },
+  { to: '/emergency', label: '🚨 Emergency' },
 ]
 
 export default function AppLayout() {

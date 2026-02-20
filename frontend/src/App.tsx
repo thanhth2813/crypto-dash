@@ -3,8 +3,11 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import AppLayout from './components/layout/AppLayout'
 import Dashboard from './pages/Dashboard'
 import Portfolio from './pages/Portfolio'
+import Bots from './pages/Bots'
+import Trades from './pages/Trades'
 import Alerts from './pages/Alerts'
 import Signals from './pages/Signals'
+import Emergency from './pages/Emergency'
 import Login from './pages/Login'
 import Register from './pages/Register'
 
@@ -24,8 +27,11 @@ function AppRoutes() {
       <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
         <Route path="/"          element={<Dashboard />} />
         <Route path="/portfolio" element={<Portfolio />} />
+        <Route path="/bots"      element={<Bots />} />
+        <Route path="/trades"    element={<Trades />} />
         <Route path="/alerts"    element={<Alerts />} />
         <Route path="/signals"   element={<Signals />} />
+        <Route path="/emergency" element={<Emergency />} />
       </Route>
 
       {/* Fallback */}
