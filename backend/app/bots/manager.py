@@ -105,7 +105,28 @@ class BotManager:
     async def _execute_bot_tick(self, bot_id: int, bot_data: dict) -> None:
         """Execute one tick of bot logic."""
         strategy = bot_data["strategy"]
-        
+
+        # Risk check before placing any order (best-effort estimate)
+        try:
+            from ..services.risk_manager import RiskManager
+
+            rm = RiskManager()
+            cfg = bot_data.get("config") or {}
+
+            # Estimate order amount in USD (quote)
+            order_amount_usd = float(cfg.get("amount_per_buy") or cfg.get("amount") or 0.0)
+            allowed, reason = await rm.check_order(
+                bot_id=bot_id,
+                user_id=bot_data.get("user_id"),
+                order_amount_usd=order_amount_usd,
+                symbol=bot_data.get("symbol"),
+            )
+            if not allowed:
+                logger.warning(f"Bot {bot_id} blocked by RiskManager: {reason}")
+                return
+        except Exception as e:
+            logger.warning(f"RiskManager check failed (fail-open): {e}")
+
         try:
             if strategy == "dca":
                 await self._run_dca_tick(bot_id, bot_data)

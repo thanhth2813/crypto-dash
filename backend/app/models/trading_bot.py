@@ -40,6 +40,7 @@ class TradingBot(Base):
     symbol: Mapped[str] = mapped_column(String, nullable=False, index=True)  # BTCUSDT
     
     config: Mapped[dict] = mapped_column(JSON, nullable=False)  # Strategy-specific config
+    risk_config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # RiskManager config
     status: Mapped[str] = mapped_column(String, nullable=False, default="created", index=True)
     paper_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     
