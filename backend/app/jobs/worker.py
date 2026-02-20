@@ -18,6 +18,36 @@ async def main():
     manager = BotManager.get_instance()
     logger.info("BotManager initialized - APScheduler running")
     
+    # Auto-load running bots from database
+    from sqlalchemy import select
+    from ..database import SessionLocal
+    from ..models.trading_bot import TradingBot
+    
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(TradingBot).where(TradingBot.status == "running")
+        )
+        running_bots = result.scalars().all()
+        
+        if running_bots:
+            logger.info(f"Auto-loading {len(running_bots)} running bots...")
+            for bot in running_bots:
+                try:
+                    bot_data = {
+                        "id": bot.id,
+                        "user_id": bot.user_id,
+                        "strategy": bot.strategy,
+                        "symbol": bot.symbol,
+                        "config": bot.config,
+                        "paper_mode": bot.paper_mode,
+                    }
+                    await manager.start_bot(bot.id, bot_data)
+                    logger.info(f"Loaded bot {bot.id}: {bot.name} ({bot.strategy})")
+                except Exception as e:
+                    logger.error(f"Failed to load bot {bot.id}: {e}")
+        else:
+            logger.info("No running bots found in database")
+    
     # Setup graceful shutdown
     def shutdown_handler(sig, frame):
         logger.info(f"Received signal {sig}, shutting down...")
