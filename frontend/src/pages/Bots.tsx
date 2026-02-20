@@ -29,6 +29,18 @@ export default function Bots() {
     symbol: 'BTCUSDT',
     paper_mode: true,
     config: '{}',
+    // DCA fields
+    amount_per_buy: '33',
+    interval_minutes: '60',
+    max_buys: '100',
+    // Grid fields
+    upper_price: '',
+    lower_price: '',
+    grid_count: '10',
+    amount_per_grid: '10',
+    // Signal fields
+    signal_amount: '33',
+    coin_id: 'bitcoin',
   })
 
   const fetchBots = async () => {
@@ -52,16 +64,38 @@ export default function Bots() {
     fetchBots()
   }, [])
 
+  const buildConfig = () => {
+    if (formData.strategy === 'dca') {
+      return {
+        symbol: formData.symbol.toUpperCase(),
+        amount_per_buy: parseFloat(formData.amount_per_buy) || 33,
+        interval_minutes: parseInt(formData.interval_minutes) || 60,
+        max_buys: parseInt(formData.max_buys) || 100,
+      }
+    }
+    if (formData.strategy === 'grid') {
+      return {
+        symbol: formData.symbol.toUpperCase(),
+        upper_price: parseFloat(formData.upper_price) || 0,
+        lower_price: parseFloat(formData.lower_price) || 0,
+        grid_count: parseInt(formData.grid_count) || 10,
+        amount_per_grid: parseFloat(formData.amount_per_grid) || 10,
+      }
+    }
+    if (formData.strategy === 'signal') {
+      return {
+        symbol: formData.symbol.toUpperCase(),
+        coin_id: formData.coin_id || 'bitcoin',
+        amount: parseFloat(formData.signal_amount) || 33,
+      }
+    }
+    return {}
+  }
+
   const handleCreateBot = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      let config = {}
-      try {
-        config = JSON.parse(formData.config)
-      } catch {
-        alert('Invalid JSON config')
-        return
-      }
+      const config = buildConfig()
 
       await api.post('/bots', {
         name: formData.name,
@@ -71,7 +105,12 @@ export default function Bots() {
         paper_mode: formData.paper_mode,
         config,
       })
-      setFormData({ name: '', strategy: 'dca', exchange: 'paper', symbol: 'BTCUSDT', paper_mode: true, config: '{}' })
+      setFormData({
+        name: '', strategy: 'dca', exchange: 'paper', symbol: 'BTCUSDT', paper_mode: true, config: '{}',
+        amount_per_buy: '33', interval_minutes: '60', max_buys: '100',
+        upper_price: '', lower_price: '', grid_count: '10', amount_per_grid: '10',
+        signal_amount: '33', coin_id: 'bitcoin',
+      })
       setShowCreateForm(false)
       await fetchBots()
     } catch (err) {
@@ -186,13 +225,153 @@ export default function Bots() {
               />
               <label className="text-gray-400 text-sm">Paper Mode (simulated trading)</label>
             </div>
-            <textarea
-              placeholder='Config JSON (e.g., {"interval_seconds": 60})'
-              value={formData.config}
-              onChange={(e) => setFormData({ ...formData, config: e.target.value })}
-              rows={3}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500 font-mono"
-            />
+
+            {/* Strategy-specific config fields */}
+            {formData.strategy === 'dca' && (
+              <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-green-400">💰 DCA Settings</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Amount per Buy (USDT)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      placeholder="33"
+                      value={formData.amount_per_buy}
+                      onChange={(e) => setFormData({ ...formData, amount_per_buy: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Interval (minutes)</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="60"
+                      value={formData.interval_minutes}
+                      onChange={(e) => setFormData({ ...formData, interval_minutes: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Max Buys</label>
+                    <input
+                      type="number"
+                      min="1"
+                      placeholder="100"
+                      value={formData.max_buys}
+                      onChange={(e) => setFormData({ ...formData, max_buys: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Total budget: ${((parseFloat(formData.amount_per_buy) || 0) * (parseInt(formData.max_buys) || 0)).toFixed(2)} USDT
+                </p>
+              </div>
+            )}
+
+            {formData.strategy === 'grid' && (
+              <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-blue-400">📊 Grid Settings</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Upper Price (USDT)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g., 70000"
+                      value={formData.upper_price}
+                      onChange={(e) => setFormData({ ...formData, upper_price: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Lower Price (USDT)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="e.g., 60000"
+                      value={formData.lower_price}
+                      onChange={(e) => setFormData({ ...formData, lower_price: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Grid Count</label>
+                    <input
+                      type="number"
+                      min="2"
+                      placeholder="10"
+                      value={formData.grid_count}
+                      onChange={(e) => setFormData({ ...formData, grid_count: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Amount per Grid (USDT)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      placeholder="10"
+                      value={formData.amount_per_grid}
+                      onChange={(e) => setFormData({ ...formData, amount_per_grid: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Total budget: ${((parseFloat(formData.amount_per_grid) || 0) * (parseInt(formData.grid_count) || 0)).toFixed(2)} USDT
+                </p>
+              </div>
+            )}
+
+            {formData.strategy === 'signal' && (
+              <div className="border border-gray-700 rounded-lg p-4 space-y-3">
+                <h4 className="text-sm font-semibold text-purple-400">📈 Signal Settings</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Amount per Trade (USDT)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      placeholder="33"
+                      value={formData.signal_amount}
+                      onChange={(e) => setFormData({ ...formData, signal_amount: e.target.value })}
+                      required
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Coin ID (CoinGecko)</label>
+                    <select
+                      value={formData.coin_id}
+                      onChange={(e) => setFormData({ ...formData, coin_id: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-green-500"
+                    >
+                      <option value="bitcoin">Bitcoin (BTC)</option>
+                      <option value="ethereum">Ethereum (ETH)</option>
+                      <option value="solana">Solana (SOL)</option>
+                      <option value="binancecoin">BNB</option>
+                      <option value="cardano">Cardano (ADA)</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Bot will auto-trade when RSI+EMA signals BUY or SELL
+                </p>
+              </div>
+            )}
             <button
               type="submit"
               className="w-full bg-green-500 hover:bg-green-400 text-black font-semibold py-2 rounded-lg transition-colors"

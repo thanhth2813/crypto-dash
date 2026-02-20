@@ -83,8 +83,16 @@ class RiskManager:
         return True, "ok"
 
     async def get_daily_pnl(self, bot_id: int) -> float:
-        """SUM sells - buys for FILLED orders today (UTC)."""
-        day_start = _utc_day_start()
+        """Daily P&L proxy: SUM(sells - buys) for FILLED orders today (UTC).
+
+        Uses trade_orders (filled_amount * filled_price) where:
+        - sell contributes +value
+        - buy contributes -value
+
+        Note: this is cash-flow based; it approximates realized pnl (ignores inventory valuation).
+        """
+
+        today = _utc_day_start()
 
         async with SessionLocal() as db:
             stmt = (
@@ -92,8 +100,8 @@ class RiskManager:
                     func.coalesce(
                         func.sum(
                             func.case(
-                                (TradeOrder.side == "sell", TradeOrder.filled_price * TradeOrder.filled_amount),
-                                else_=-TradeOrder.filled_price * TradeOrder.filled_amount,
+                                (func.lower(TradeOrder.side) == "sell", TradeOrder.filled_amount * TradeOrder.filled_price),
+                                else_=-TradeOrder.filled_amount * TradeOrder.filled_price,
                             )
                         ),
                         0,
@@ -101,14 +109,15 @@ class RiskManager:
                 )
                 .where(
                     TradeOrder.bot_id == bot_id,
-                    TradeOrder.status == "filled",
-                    TradeOrder.created_at >= day_start,
+                    func.lower(TradeOrder.status) == "filled",
+                    TradeOrder.created_at >= today,
                     TradeOrder.filled_price.is_not(None),
+                    TradeOrder.filled_amount.is_not(None),
                 )
             )
+
             res = await db.execute(stmt)
-            val = res.scalar_one()
-            return _to_float(val)
+            return _to_float(res.scalar_one())
 
     async def get_total_exposure(self, user_id: int) -> float:
         """Sum total_invested for running bots."""
@@ -121,15 +130,17 @@ class RiskManager:
             return _to_float(res.scalar_one())
 
     async def trigger_circuit_breaker(self, bot_id: int, reason: str) -> None:
-        """Pause bot and stop scheduler job."""
+        """Stop bot immediately and notify.
+
+        - Update DB: trading_bots.status -> "stopped"
+        - Stop APScheduler job via BotManager
+        - Send Telegram notification (best-effort)
+        """
+
         logger.warning("Circuit breaker bot_id=%s reason=%s", bot_id, reason)
 
         async with SessionLocal() as db:
-            await db.execute(
-                update(TradingBot)
-                .where(TradingBot.id == bot_id)
-                .values(status="paused")
-            )
+            await db.execute(update(TradingBot).where(TradingBot.id == bot_id).values(status="stopped"))
             await db.commit()
 
         try:
@@ -139,6 +150,14 @@ class RiskManager:
             await manager.stop_bot(bot_id)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to stop bot via BotManager: %s", exc)
+
+        try:
+            from ..services.notification_service import get_notification_service
+
+            notification = get_notification_service()
+            await notification.notify_risk_circuit_breaker(bot_id=bot_id, reason=reason)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to send circuit breaker notification: %s", exc)
 
     async def _get_bot(self, db: AsyncSession, *, bot_id: int, user_id: int) -> TradingBot:
         res = await db.execute(select(TradingBot).where(TradingBot.id == bot_id, TradingBot.user_id == user_id))
@@ -151,7 +170,7 @@ class RiskManager:
         async with SessionLocal() as db:
             stmt = (
                 select(TradeOrder)
-                .where(TradeOrder.bot_id == bot_id, TradeOrder.status == "filled")
+                .where(TradeOrder.bot_id == bot_id, func.lower(TradeOrder.status) == "filled")
                 .order_by(TradeOrder.created_at.asc())
                 .limit(limit)
             )
