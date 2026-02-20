@@ -200,6 +200,17 @@ class BotManager:
                 db.add(trade)
                 await db.commit()
                 logger.info(f"Bot {bot_id}: DCA order filled at ${order.avg_fill_price}")
+                
+                # Send Telegram notification
+                from ..services.notification_service import get_notification_service
+                notification = get_notification_service()
+                await notification.notify_trade_executed(
+                    bot_name=bot_data.get("name", f"Bot {bot_id}"),
+                    side=order.side.value,
+                    amount=order.filled_amount,
+                    symbol=symbol,
+                    price=order.avg_fill_price,
+                )
     
     async def _run_grid_tick(self, bot_id: int, bot_data: dict) -> None:
         """Run Grid strategy tick."""
@@ -276,6 +287,17 @@ class BotManager:
                 await db.commit()
                 logger.info(
                     f"Bot {bot_id}: Signal {order.side.value} order filled at ${order.avg_fill_price}"
+                )
+                
+                # Send Telegram notification
+                from ..services.notification_service import get_notification_service
+                notification = get_notification_service()
+                await notification.notify_trade_executed(
+                    bot_name=bot_data.get("name", f"Bot {bot_id}"),
+                    side=order.side.value,
+                    amount=order.filled_amount,
+                    symbol=symbol,
+                    price=order.avg_fill_price,
                 )
     
     def shutdown(self) -> None:
