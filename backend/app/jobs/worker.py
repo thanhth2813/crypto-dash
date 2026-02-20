@@ -20,6 +20,7 @@ async def main():
     
     # Auto-load running bots from database
     from sqlalchemy import select
+
     from ..database import SessionLocal
     from ..models.trading_bot import TradingBot
     

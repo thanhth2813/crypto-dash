@@ -25,6 +25,12 @@ class BotService:
             exchange=req.exchange,
             symbol=req.symbol.upper(),
             config=req.config,
+            risk_config={
+                "max_position_usd": 100,
+                "max_daily_loss_pct": 10,
+                "max_consecutive_losses": 5,
+                "max_drawdown_pct": 15,
+            },
             paper_mode=req.paper_mode,
             status="created",
             total_invested=0,

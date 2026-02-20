@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import api from '../services/api'
+import BotChart from '../components/BotChart'
 
 interface Bot {
   id: number
@@ -20,6 +21,7 @@ export default function Bots() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [expandedBotId, setExpandedBotId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
     name: '',
     strategy: 'dca',
@@ -221,52 +223,70 @@ export default function Bots() {
               const statusColor = bot.status === 'running' ? 'text-green-400' : 
                                  bot.status === 'error' ? 'text-red-400' : 
                                  'text-gray-400'
+              const isExpanded = expandedBotId === bot.id
               
               return (
-                <tr
-                  key={bot.id}
-                  className="border-t border-gray-800 hover:bg-gray-800/50 transition-colors"
-                >
-                  <td className="px-4 py-3">
-                    <div className="text-white font-medium">{bot.name}</div>
-                    <div className="text-gray-500 text-xs">{bot.exchange} {bot.paper_mode && '(Paper)'}</div>
-                  </td>
-                  <td className="px-4 py-3 text-white uppercase text-sm">{bot.strategy}</td>
-                  <td className="px-4 py-3 text-gray-400 font-mono text-sm">{bot.symbol}</td>
-                  <td className={`px-4 py-3 ${statusColor} font-semibold uppercase text-sm`}>
-                    {bot.status}
-                  </td>
-                  <td className="px-4 py-3 text-right text-white">${bot.total_invested.toFixed(2)}</td>
-                  <td className={`px-4 py-3 text-right font-semibold ${pnlColor}`}>
-                    {bot.total_pnl >= 0 ? '+' : ''}${bot.total_pnl.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 text-right space-x-2">
-                    {bot.status !== 'running' && (
-                      <button
-                        onClick={() => handleStartBot(bot.id)}
-                        className="text-green-400 hover:text-green-300 text-sm"
-                      >
-                        Start
-                      </button>
-                    )}
-                    {bot.status === 'running' && (
-                      <button
-                        onClick={() => handleStopBot(bot.id)}
-                        className="text-yellow-400 hover:text-yellow-300 text-sm"
-                      >
-                        Stop
-                      </button>
-                    )}
-                    {bot.status !== 'running' && (
-                      <button
-                        onClick={() => handleDeleteBot(bot.id)}
-                        className="text-red-400 hover:text-red-300 text-sm"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                <>
+                  <tr
+                    key={bot.id}
+                    className="border-t border-gray-800 hover:bg-gray-800/50 transition-colors cursor-pointer"
+                    onClick={() => setExpandedBotId(isExpanded ? null : bot.id)}
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400">
+                          {isExpanded ? '▼' : '▶'}
+                        </span>
+                        <div>
+                          <div className="text-white font-medium">{bot.name}</div>
+                          <div className="text-gray-500 text-xs">{bot.exchange} {bot.paper_mode && '(Paper)'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-white uppercase text-sm">{bot.strategy}</td>
+                    <td className="px-4 py-3 text-gray-400 font-mono text-sm">{bot.symbol}</td>
+                    <td className={`px-4 py-3 ${statusColor} font-semibold uppercase text-sm`}>
+                      {bot.status}
+                    </td>
+                    <td className="px-4 py-3 text-right text-white">${bot.total_invested.toFixed(2)}</td>
+                    <td className={`px-4 py-3 text-right font-semibold ${pnlColor}`}>
+                      {bot.total_pnl >= 0 ? '+' : ''}${bot.total_pnl.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
+                      {bot.status !== 'running' && (
+                        <button
+                          onClick={() => handleStartBot(bot.id)}
+                          className="text-green-400 hover:text-green-300 text-sm"
+                        >
+                          Start
+                        </button>
+                      )}
+                      {bot.status === 'running' && (
+                        <button
+                          onClick={() => handleStopBot(bot.id)}
+                          className="text-yellow-400 hover:text-yellow-300 text-sm"
+                        >
+                          Stop
+                        </button>
+                      )}
+                      {bot.status !== 'running' && (
+                        <button
+                          onClick={() => handleDeleteBot(bot.id)}
+                          className="text-red-400 hover:text-red-300 text-sm"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr key={`${bot.id}-details`} className="border-t border-gray-800">
+                      <td colSpan={7} className="px-4 py-6 bg-gray-950">
+                        <BotChart botId={bot.id} botName={bot.name} />
+                      </td>
+                    </tr>
+                  )}
+                </>
               )
             })}
           </tbody>
