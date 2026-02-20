@@ -34,6 +34,8 @@ class PaperExchange(BaseExchange):
             r = get_redis_client()
             raw = await r.get(self._balances_key())
             if not raw:
+                # First time — save initial balances to Redis
+                await self._save_balances()
                 return
             data = json.loads(raw)
             self._balances = {k: Balance(**v) for k, v in data.items()}

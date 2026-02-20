@@ -193,9 +193,9 @@ class BotManager:
                     filled_amount=order.filled_amount,
                     filled_price=order.avg_fill_price,
                     status="filled",
-                    fee=order.fee,
+                    fee=0,
                     fee_currency="USDT",
-                    exchange_order_id=order.order_id,
+                    exchange_order_id=order.id,
                 )
                 db.add(trade)
                 await db.commit()
@@ -268,9 +268,9 @@ class BotManager:
                     filled_amount=order.filled_amount,
                     filled_price=order.avg_fill_price,
                     status="filled",
-                    fee=order.fee,
+                    fee=0,
                     fee_currency="USDT",
-                    exchange_order_id=order.order_id,
+                    exchange_order_id=order.id,
                 )
                 db.add(trade)
                 await db.commit()
