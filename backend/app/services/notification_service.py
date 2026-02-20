@@ -87,10 +87,10 @@ class NotificationService:
     ) -> bool:
         """Send notification when circuit breaker is triggered."""
         
-        message = f"⚠️ <b>CIRCUIT BREAKER TRIGGERED</b>\n\n"
+        message = "⚠️ <b>CIRCUIT BREAKER TRIGGERED</b>\n\n"
         message += f"Reason: {reason}\n"
         message += f"Details: {details}\n"
-        message += f"\n🛑 All bots have been stopped for safety."
+        message += "\n🛑 All bots have been stopped for safety."
         
         return await self.send_message(message)
 
@@ -103,7 +103,7 @@ class NotificationService:
     ) -> bool:
         """Send notification when a price alert is triggered."""
         
-        message = f"🔔 <b>Alert Triggered</b>\n\n"
+        message = "🔔 <b>Alert Triggered</b>\n\n"
         message += f"📌 {alert_name}\n"
         message += f"📊 {symbol}: ${price:,.2f}\n"
         message += f"Condition: {condition}\n"
@@ -117,10 +117,10 @@ class NotificationService:
     ) -> bool:
         """Send notification when a bot encounters an error."""
         
-        message = f"❌ <b>Bot Error</b>\n\n"
+        message = "❌ <b>Bot Error</b>\n\n"
         message += f"🤖 Bot: {bot_name}\n"
         message += f"Error: {error}\n"
-        message += f"\n⚠️ Bot has been stopped."
+        message += "\n⚠️ Bot has been stopped."
         
         return await self.send_message(message)
 
@@ -132,7 +132,7 @@ class NotificationService:
     ) -> bool:
         """Send system status notification."""
         
-        message = f"ℹ️ <b>System Status</b>\n\n"
+        message = "ℹ️ <b>System Status</b>\n\n"
         message += f"🤖 Running bots: {running_bots}\n"
         message += f"💰 Total exposure: ${total_exposure:,.2f}\n"
         

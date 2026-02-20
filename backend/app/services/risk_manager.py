@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, time, timezone
 from decimal import Decimal
 
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import SessionLocal
@@ -52,7 +52,8 @@ class RiskManager:
                 daily_pnl = await self.get_daily_pnl(bot_id)
                 daily_loss_pct = (abs(daily_pnl) / invested) * 100 if daily_pnl < 0 else 0.0
                 if daily_loss_pct > max_daily_loss_pct:
-                    await self.trigger_circuit_breaker(bot_id, f"daily loss {daily_loss_pct:.2f}% > {max_daily_loss_pct}%")
+                    reason = f"daily loss {daily_loss_pct:.2f}% > {max_daily_loss_pct}%"
+                    await self.trigger_circuit_breaker(bot_id, reason)
                     return False, "max_daily_loss_pct hit"
 
             # 3) global max_total_exposure (optional)
@@ -67,7 +68,8 @@ class RiskManager:
             if max_consecutive_losses > 0:
                 consecutive = await self._get_consecutive_losses(bot_id, max_n=max_consecutive_losses)
                 if consecutive >= max_consecutive_losses:
-                    await self.trigger_circuit_breaker(bot_id, f"consecutive losses {consecutive} >= {max_consecutive_losses}")
+                    reason = f"consecutive losses {consecutive} >= {max_consecutive_losses}"
+                    await self.trigger_circuit_breaker(bot_id, reason)
                     return False, "max_consecutive_losses hit"
 
             # 5) max drawdown from peak

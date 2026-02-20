@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..exchanges.base import BaseExchange
 from ..exchanges.models import Order, OrderSide, OrderType
