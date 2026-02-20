@@ -162,6 +162,8 @@ class BotManager:
             logger.warning(f"Bot {bot_id}: price not found for {coin_id}")
             return
         
+        logger.info(f"Bot {bot_id}: DCA tick - symbol={symbol}, coin_id={coin_id}, price=${market_price}")
+        
         # Create bot instance with valid config fields
         bot_config = DcaBotConfig(
             symbol=symbol,
@@ -173,6 +175,8 @@ class BotManager:
         
         # Execute tick
         order = await bot.tick(market_price=market_price)
+        
+        logger.info(f"Bot {bot_id}: DCA tick result - order={order}, status={order.status.value if order else 'None'}")
         
         # Log order to database if filled
         if order and order.status.value == "FILLED":
