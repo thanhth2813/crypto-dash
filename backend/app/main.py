@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from .routers import alerts, auth, bots, market, portfolio, signals, trades
+from .routers import alerts, auth, bots, emergency, market, portfolio, signals, trades
 
 
 @asynccontextmanager
@@ -28,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(signals.router)
     app.include_router(bots.router)
     app.include_router(trades.router)
+    app.include_router(emergency.router)
 
     return app
 
