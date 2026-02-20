@@ -1,25 +1,47 @@
-"""Background worker for scheduled jobs.
-
-Placeholder until Codex implements Task #14 (APScheduler alert checker).
-"""
+"""Background worker for scheduled jobs and bot execution."""
 from __future__ import annotations
 
 import asyncio
 import logging
+import signal
+
+from ..bots.manager import BotManager
 
 logger = logging.getLogger(__name__)
 
 
 async def main():
-    """Worker main loop (placeholder)."""
-    logger.info("Worker started (placeholder - waiting for Task #14 implementation)")
+    """Worker main loop with BotManager."""
+    logger.info("Worker starting with BotManager...")
     
-    # Keep worker alive
-    while True:
-        await asyncio.sleep(60)
-        logger.debug("Worker heartbeat")
+    # Initialize BotManager singleton
+    manager = BotManager.get_instance()
+    logger.info("BotManager initialized - APScheduler running")
+    
+    # Setup graceful shutdown
+    def shutdown_handler(sig, frame):
+        logger.info(f"Received signal {sig}, shutting down...")
+        manager.shutdown()
+        asyncio.get_event_loop().stop()
+    
+    signal.signal(signal.SIGINT, shutdown_handler)
+    signal.signal(signal.SIGTERM, shutdown_handler)
+    
+    # Keep worker alive - scheduler runs in background
+    try:
+        while True:
+            await asyncio.sleep(60)
+            logger.debug(f"Worker heartbeat - {len(manager.running_bots)} bots running")
+    except KeyboardInterrupt:
+        logger.info("Worker interrupted")
+    finally:
+        manager.shutdown()
+        logger.info("Worker shutdown complete")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     asyncio.run(main())
